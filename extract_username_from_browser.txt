@@ -1,0 +1,66 @@
+(() => {
+  // find the submissions table by headers
+  const tables = [...document.querySelectorAll("table")];
+  const norm = s => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+  const tbl = tables.find(t => {
+    const hs = [...t.querySelectorAll("thead th")].map(th => norm(th.innerText || th.textContent));
+    return hs.some(h => h.includes("first name") || h.includes("last name"))
+        && hs.some(h => h.includes("online text"));
+  });
+  if (!tbl) { console.warn("Submissions table not found."); return; }
+
+  const headers = [...tbl.querySelectorAll("thead th")].map(th => norm(th.innerText || th.textContent));
+  const nameCol = headers.findIndex(h => h.includes("first name") || h.includes("last name"));
+  const onlineCol = headers.findIndex(h => h.includes("online text"));
+  if (nameCol === -1 || onlineCol === -1) { console.warn("Expected columns not found."); return; }
+
+  const SPECIAL = new Set(["features","topics","marketplace","apps","collections","sponsors","orgs","settings"]);
+  const getUser = href => {
+    try {
+      const u = new URL(href);
+      if (!/(^|\.)github\.com$/i.test(u.hostname)) return null;
+      const seg = u.pathname.split("/").filter(Boolean)[0];
+      if (!seg || SPECIAL.has(seg.toLowerCase())) return null;
+      return seg;
+    } catch { return null; }
+  };
+
+  const rows = [...tbl.querySelectorAll("tbody tr")];
+  const items = rows.map(tr => {
+    const tds = [...tr.querySelectorAll("td")];
+    const nameCell = tds[nameCol], onlineCell = tds[onlineCol];
+    if (!nameCell || !onlineCell) return null;
+
+    const nameLink = nameCell.querySelector("a");
+    const name = (nameLink ? nameLink.innerText : nameCell.innerText).replace(/\s+/g, " ").trim();
+
+    const ghA = onlineCell.querySelector('a[href*="github.com/"]');
+    const username = ghA ? getUser(ghA.href) : null;
+
+    if (!name || !username) return null;
+    return { name, username };
+  }).filter(Boolean);
+
+  // de-dupe by username
+  const seen = new Set();
+  const out = items.filter(r => (seen.has(r.username) ? false : (seen.add(r.username), true)));
+
+  console.table(out);
+
+  // copy CSV to clipboard
+  const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = ["name,username", ...out.map(r => `${esc(r.name)},${esc(r.username)}`)].join("\n");
+
+  (async () => {
+    try {
+      await navigator.clipboard.writeText(csv);
+      console.log(`Copied ${out.length} rows to clipboard as CSV (name,username).`);
+    } catch {
+      console.log("Clipboard blocked; showing prompt.");
+      prompt("Copy CSV:", csv);
+    }
+  })();
+
+  // also stash in window for quick reuse
+  window.__HW_GITHUB = { rows: out, csv };
+})();
