@@ -18,7 +18,7 @@ python3 invite_to_org.py --org DS-223-2025-Fall --file github_usernames.json
 
 3) Create teams & add members
 
-(Requires group in the JSON for each student. If needed, first merge from your sheet using assign_groups.py.)
+(Requires group in the JSON for each student. Sadly done manually)
 ```bash
 python3 manage_groups.py \
   --org DS-223-2025-Fall \
